@@ -1,0 +1,488 @@
+<!doctype html>
+<!--
+Copyright 2019 Google Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!--
+This work is based on the example 'Read Characteristic Value Changed' 
+contributed by the Google Chrome Team at 
+https://googlechrome.github.io/samples/web-bluetooth/
+It has been modified by the Silicon Labs Apps Team to support an 
+application of Wi-Fi commissioning using Web BLE.
+It is made available as an example under the terms of the 
+Apache License, Version 2.0
+-->
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="Sample illustrating the use of Web Bluetooth to perform Wi-Fi commissioning.">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+      .buttons {
+        width: 300px;
+        text-align-last:center;
+      }
+      .row_label {
+        font-size: 14px;
+        color: #696969;
+      }
+      .ap_device_options {
+         /*display: table-row;*/ 
+         display: none;
+      }
+      .iot_device_options{
+          display: none;
+      }
+    </style>
+
+    <script src="web_ble.js"></script>
+
+    <title>Wi-Fi Commissioning using Web BLE</title>
+
+    <script>
+      // Add a global error event listener early on in the page load, to help ensure that browsers
+      // which don't support specific functionality still end up displaying a meaningful message.
+      window.addEventListener('error', function(error) {
+        if (ChromeSamples && ChromeSamples.setStatus) {
+          console.error(error);
+          ChromeSamples.setStatus(error.message + ' (Your browser may not support this feature.)');
+          error.preventDefault();
+        }
+      });
+    </script>   
+  </head>
+
+  <body>
+   <h3>Wi-Fi Commissioning using Web BLE</h3>
+
+   <script>
+     if('serviceWorker' in navigator) {
+       navigator.serviceWorker.register('service-worker.js');
+     }
+   </script>
+
+   <table align="center" cellpadding="5">
+     <tr>
+       <td></td>
+       <td>
+          <button id="btnConnect" class="buttons">Connect Bluetooth Device</button>
+       </td>
+     </tr>    
+     
+      <tr class="ap_sta_options" style="display:none;padding-top:10px">
+          <td align="right">
+              <span class="row_label">Select AP/STA:</span> 
+          </td>
+          <td>
+              <input class="capability-radio" type="radio" id="ap_sta_1" name="ap_sta" value="AP"/><label>AP</label>
+              <input class="capability-radio" type="radio" id="ap_sta_2" name="ap_sta" value="STA"/><label>STA</label>
+          </td>
+      </tr>
+      
+     <tr class="ap_device_options">
+      <td align="right">
+        <span class="row_label">Conf. State:</span> 
+      </td>
+      <td>
+        <input id="ap_status" type="text" style="width:292px;text-align-last:center;" value="" disabled/>
+      </td>
+    </tr>
+    <tr class="ap_device_options">
+      <td align="right">
+        <span class="row_label">SSID:</span> 
+      </td>
+      <td>
+        <input id="ap_ssid" type="text" style="width:292px;text-align-last:center;" value=""/>
+      </td>
+    </tr>
+    <tr class="ap_device_options">
+      <td align="right">
+        <span class="row_label">Passphrase:</span> 
+      </td>
+      <td>
+        <input id="ap_passphrase" type="text" style="width:292px;text-align-last:center;" value=""/>
+      </td>
+    </tr>
+    <tr class="ap_device_options">
+      <td align="right">
+        <span class="row_label">Security:</span> 
+      </td>
+      <td>
+        <!-- <input id="ap_security" type="text" style="width:292px;text-align-last:center;" value=""/> -->
+        <select id="ap_security" class="buttons" style="width: 300px;">
+          <option value="1">WIRELESS_SECURITY_WPA_PERSONAL</option>
+          <option value="2">WIRELESS_SECURITY_WPA_WPA2_PERSONAL</option>
+          <option value="3">WIRELESS_SECURITY_WPA2_PERSONAL</option>
+<!--          <option value="3">WIRELESS_SECURITY_WPA3</option>
+          <option value="4">WIRELESS_SECURITY_WPA2_WPA3_PERSONAL</option>-->
+        </select>
+      </td>
+    </tr>
+    <tr class="" style="visibility: collapse; ">
+      <td align="right">
+        <span class="row_label">is_config_ap:</span> 
+      </td>
+      <td>
+        <input id="ap_is_config_ap" type="text" style="width:292px;text-align-last:center;" value="1" />
+      </td>
+    </tr>
+    <tr class="" style="visibility: collapse; ">
+      <td align="right">
+        <span class="row_label">is_radio_5g:</span> 
+      </td>
+      <td>
+        <input id="ap_is_radio_5g" type="text" style="width:292px;text-align-last:center;" value="1" />
+      </td>
+    </tr>
+    <tr class="" style="visibility: collapse; ">
+      <td align="right">
+        <span class="row_label">Current State:</span> 
+      </td>
+      <td>
+        <input id="ap_state" type="text" style="width:292px;text-align-last:center;" value="1" />
+      </td>
+    </tr>
+    <tr class="ap_device_options">
+      <td></td>
+      <td>
+         <button id="saveAPSettings" class="buttons" style="" disabled>Save AP Configuration</button>
+      </td>
+    </tr>
+
+          
+      
+    <tr class="iot_device_status" style="display:none">
+      <td align="right">
+        <span class="row_label">Scanner State:</span> 
+      </td>
+      <td>
+        <input id="iot_state" type="text" style="width:292px;text-align-last:center;" value="" disabled/>
+      </td>
+    </tr>
+    
+
+      <tr>
+        <td></td>
+        <td>
+          <button style="display:none" id="btnScan" class="buttons" disabled>Find Access Points</button>
+        </td>
+      </tr> 
+
+
+      
+      <tr class="iot_device_options">
+        <td align="right">
+          <span class="row_label">Select Access Point:</span> 
+        </td>
+        <td>
+          <select id="iot_ssid" class="buttons" style="width: 300px;">
+              <option value="" selected="selected">Select Access Point</option>
+          </select>
+        </td>
+      </tr>
+      <tr class="iot_device_options">
+        <td align="right">
+          <span class="row_label">Radio</span> 
+        </td>
+        <td>
+          <input id="iot_radio" type="text" style="width:292px;text-align-last:center;" value="" disabled/>
+        </td>
+      </tr> 
+      <tr class="iot_device_options">
+        <td align="right">
+          <span class="row_label">ssid</span> 
+        </td>
+        <td>
+          <input id="iot_sssid" type="text" style="width:292px;text-align-last:center;" value="" disabled/>
+        </td>
+      </tr> 
+      <tr class="iot_device_options">
+        <td align="right">
+          <span class="row_label">rcpi</span> 
+        </td>
+        <td>
+          <input id="iot_rcpi" type="text" style="width:292px;text-align-last:center;" value="" disabled/>
+        </td>
+      </tr> 
+      <tr class="iot_device_options">
+        <td align="right">
+          <span class="row_label">Security</span> 
+        </td>
+        <td>
+          <input id="iot_sec" type="text" style="width:292px;text-align-last:center;" value="" disabled/>
+        </td>
+      </tr> 
+      <tr class="iot_device_options">
+        <td align="right">
+          <span class="row_label">Passphrase:</span> 
+        </td>
+        <td>
+          <input id="iot_passphrase" type="password" style="width:292px;text-align-last:center;" value=""/>
+        </td>
+      </tr> 
+      <tr style="display: none;">
+        <td></td>
+        <td>
+          <select id="selAccessPoint" class="buttons" disabled><option></option></select>
+        </td>
+      </tr>
+      <tr style="display: none;"> 
+        <td></td>
+        <td>
+          <input id="txtPassword" type="password" style="width:292px;text-align-last:center;" value="password" disabled/>
+        </td>
+      </tr>
+     <tr class="" style="visibility: collapse; ">
+      <td align="right">
+        <span class="row_label">is_config_ap:</span> 
+      </td>
+      <td>
+        <input id="iot_is_config_ap" type="text" style="width:292px;text-align-last:center;" value="0" />
+      </td>
+    </tr>
+    <tr class="" style="visibility: collapse; ">
+      <td align="right">
+        <span class="row_label">is_radio_5g:</span> 
+      </td>
+      <td>
+        <input id="iot_is_radio_5g" type="text" style="width:292px;text-align-last:center;" value="0" />
+      </td>
+    </tr>
+    <tr>
+        <td></td>
+        <td>
+          <button style="display:none;margin-top: 10px" id="btnSave" class="buttons" disabled>Save Access Point</button>
+        </td>
+    </tr>      
+    <tr>
+        <td></td>
+        <td>
+            <button style="display:none" id="btnJoin" class="buttons" disabled>Join Access Point</button>
+        </td>
+    </tr>      
+    <tr class="ap_device_options">
+        <td></td>
+        <td>
+          <button style="display:none" id="btnReset" class="buttons">Reset Bluetooth Device</button>
+        </td>
+    </tr>
+   </table>
+
+  <script>
+    // Live Logger
+
+    var ChromeSamples = {
+      log: function() {
+        var line = Array.prototype.slice.call(arguments).map(function(argument) {
+          return typeof argument === 'string' ? argument : JSON.stringify(argument);
+        }).join(' ');
+
+        document.querySelector('#log').textContent += line + '\n';
+
+        document.querySelector('#output').scrollTop = document.querySelector('#output').scrollHeight;
+      },
+
+      clearLog: function() {
+        document.querySelector('#log').textContent = '';
+      },
+
+      setStatus: function(status) {
+        document.querySelector('#status').textContent = status;
+      },
+
+      setContent: function(newContent) {
+        var content = document.querySelector('#content');
+        while(content.hasChildNodes()) {
+          content.removeChild(content.lastChild);
+        }
+        content.appendChild(newContent);
+      }
+    };
+  </script>
+
+  <h3>Live Output</h3>
+  <div id="output" class="output"
+   style="height:220px; max-height: 220px; overflow-y: scroll; background-color:black; color:gray; font-family: 'Courier New', Courier, monospace; font-size: 8pt;">
+   <div id="content"></div>
+   <div id="status"></div>
+   <pre id="log"></pre>
+  </div>
+
+  <script>
+    if (/Chrome\/(\d+\.\d+.\d+.\d+)/.test(navigator.userAgent)){
+      // Let's log a warning if the sample is not 
+      // supposed to execute on this version of Chrome.
+      if (55 > parseInt(RegExp.$1)) {
+        ChromeSamples.setStatus('Warning! Keep in mind this sample has been tested with Chrome ' + 55 + '.');
+      }
+    }
+  </script>
+
+  <script>
+    // Adding Button Click Event Listeners
+    // The event handlers are defined in web_ble.js
+    // setIOTDeviceOptions();
+    document.querySelector('#saveAPSettings').addEventListener('click', function() {
+      onAPSettingsButtonClick();
+    });
+
+    // document.querySelector('#saveAPSettings').addEventListener('change', function() {
+    //   onAPSettingsChange();
+    // });
+
+
+    document.querySelector('#btnConnect').addEventListener('click', function() {
+      if (isWebBluetoothEnabled()) {
+        onConnectButtonClick();
+      }
+    });
+
+     document.querySelector('#btnScan').addEventListener('click', function() {
+       if (isWebBluetoothEnabled()) {
+         onScanButtonClick();
+       }
+     });
+
+     document.querySelector('#btnSave').addEventListener('click', function() {
+       if (isWebBluetoothEnabled()) {
+         onSaveButtonClick();
+       }
+     });
+     
+     document.querySelector("#ap_sta_1").addEventListener('change',function(){
+        document.querySelector("#btnScan").disabled = true;
+        document.getElementById("btnScan").style.display = 'none';
+        document.getElementById("btnSave").style.display = 'none';
+        document.querySelector(".iot_device_status").style.display = 'none';
+        document.getElementById("btnSave").disabled = true;
+        var elements = document.getElementsByClassName('ap_device_options');
+        for (var i = 0; i < elements.length; i++){
+          elements[i].style.display = 'table-row';
+        }
+        var iotElements = document.getElementsByClassName('iot_device_options');
+        for (var i = 0; i < iotElements.length; i++){
+          iotElements[i].style.display = 'none';
+        }
+     });
+     
+     document.querySelector("#ap_sta_2").addEventListener('change',function(){
+        document.querySelector("#btnScan").disabled = false;
+        document.getElementById("btnScan").style.display = 'block';
+        document.querySelector(".iot_device_status").style.display = 'table-row';
+         var elements = document.getElementsByClassName('ap_device_options');
+        for (var i = 0; i < elements.length; i++){
+          elements[i].style.display = 'none';
+        }
+        document.querySelector("#iot_state").disabled = false;
+        var iotState = document.querySelector("#iot_state").value;
+        document.querySelector("#iot_state").disabled = true;
+        document.querySelector("#ap_status").closest(".ap_device_options").style.display = "table-row";
+        var iotElements = document.getElementsByClassName('iot_device_options');
+        if(iotState == "WIFI_SCANNER_STATE_SCANNED"){
+            for (var i = 0; i < iotElements.length; i++){
+              iotElements[i].style.display = 'table-row';
+            }
+        }else{
+            for (var i = 0; i < iotElements.length; i++){
+              iotElements[i].style.display = 'none';
+            }  
+        }
+        document.querySelector("#iot_passphrase").value = "";
+     });
+
+    // document.querySelector('#btnJoin').addEventListener('click', function() {
+    //   if (isWebBluetoothEnabled()) {
+    //     onJoinButtonClick();
+    //   }
+    // });
+
+     document.querySelector('#btnReset').addEventListener('click', function(event) {
+       if (isWebBluetoothEnabled()) {
+         //ChromeSamples.clearLog();
+         onResetButtonClick();
+       }
+     });
+
+  </script>
+
+  <script>
+    // Web Bluetooth API support verifier.
+
+    log = ChromeSamples.log;
+
+    function isWebBluetoothEnabled() {
+      if (navigator.bluetooth) {
+        return true;
+      } else {
+        ChromeSamples.setStatus('Web Bluetooth API is not available.\n' +
+            'Please make sure the "Experimental Web Platform" features flag is enabled:\n' +
+            'chrome://flags/#enable-experimental-web-platform-features');
+        return false;
+      }
+    }
+    
+    document.querySelector("#iot_ssid").addEventListener('change',function(event){
+        log('> showing the characteristics values');
+//        console.log(event.target.selectedOptions[0].getAttribute("data-value"));
+            if(event.target.selectedOptions[0].getAttribute("data-value") != "") {
+                let values = JSON.parse(event.target.selectedOptions[0].getAttribute("data-value"));
+                var security = "";
+                if(values.security == "1" || values.security == 1){
+                    security = "WIFI_SECURITY_WPA";
+                }else if(values.security == "2" || values.security == 2){
+                    security = "WIFI_SECURITY_WPA2";
+                }else if(values.security == "3" || values.security == 3){
+                    security = "WIFI_SECURITY_WPA_WAP2";
+                }
+                var radio_str = "";
+                if (values.radio == "1") {
+                  radio_str = "2.4 Ghz";
+                } else if(values.radio == "0") {
+                  radio_str = "5 Ghz";
+                }
+                console.log("values: ",values);
+                document.querySelector("#iot_radio").value = radio_str;
+                document.querySelector("#iot_sssid").value = values.ssid;
+                document.querySelector("#iot_rcpi").value = values.rcpi;
+                document.querySelector("#iot_sec").value = security;
+                document.querySelector("#iot_is_radio_5g").value = values.radio == "0" ? "1":"0";
+            }
+        });
+        
+        document.querySelector("#iot_passphrase").addEventListener('keyup',function(event){
+           if(this.value != ""){
+               if(this.value.length >= 6){
+                   document.querySelector("#btnSave").style.display = 'block';
+                   document.querySelector("#btnSave").disabled = false;
+               }
+           } 
+        });
+  </script>
+    
+  <script>
+    /* jshint ignore:start */
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-53563471-1', 'auto');
+    ga('send', 'pageview');
+    /* jshint ignore:end */
+  </script>
+ </body>
+</html>
